@@ -1,0 +1,36 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "Sql-Primary-Server-50": {
+            "value": "primary-server-50" 
+        },
+        "Primary-sql-location": {
+            "value": "East Us" 
+        },
+        "Primary-server-username": {
+            "value": "server" 
+        },
+        "Primary-server-password": {
+            "value": "Rajasekharreddy@7" 
+        },
+        "Sql-Primary-DB-50": {
+            "value": "primary-db-50" 
+        },
+        "Sql-Secondary-Server-50": {
+            "value": "secondary-server-50" 
+        },
+        "Sql-Secondary-location": {
+            "value": "Central Us" 
+        },
+        "Secondary-server-username": {
+            "value": "server" 
+        },
+        "Secondary-server-password": {
+            "value": "Rajasekharreddy@7" 
+        },
+        "failoverGroup-name": {
+            "value": "failover-group-50" 
+        }
+    }
+}

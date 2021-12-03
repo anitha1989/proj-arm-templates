@@ -1,0 +1,15 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tmname": {
+            "value": "demo-tm0050" 
+        },
+        "existing-pip-name1": {
+            "value": "east-apgwpip0050" 
+        },
+        "existing-pip-name2": {
+            "value": "west-apgpip0050" 
+        }
+    }
+}

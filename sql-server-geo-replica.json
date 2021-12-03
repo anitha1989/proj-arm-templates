@@ -1,0 +1,188 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        // Primary Server Name
+        "Sql-Primary-Server-50": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // Primary Server/db Location
+        "Primary-sql-location": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // Primary server login user name
+        "Primary-server-username": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // Primary Server login password
+        "Primary-server-password": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // Primary DB name
+        "Sql-Primary-DB-50": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+
+        // Secondary server name
+        "Sql-Secondary-Server-50": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // Secondary server location
+        "Sql-Secondary-location": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+
+         // Secondary server login user name
+        "Secondary-server-username": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // Secondary Server login password
+        "Secondary-server-password": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // failoverGroup name
+        "failoverGroup-name": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        }
+    },
+    "functions": [],
+    "variables": {},
+    "resources": [
+        {
+            // primary server
+            "name": "[parameters('Sql-Primary-Server-50')]",
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2014-04-01",
+            "location": "[parameters('Primary-sql-location')]",
+            "tags": {
+                "displayName": "[parameters('Sql-Primary-Server-50')]"
+            },
+            "properties": {
+                "administratorLogin": "[parameters('Primary-server-username')]",
+                "administratorLoginPassword": "[parameters('Primary-server-password')]"
+            },
+            "resources": [
+                {
+                    // allowing azure resources in firewall rules
+                    "type": "firewallRules",
+                    "apiVersion": "2014-04-01",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Sql/servers', parameters('Sql-Primary-Server-50'))]"
+                    ],
+                    "location": "[parameters('Primary-sql-location')]",
+                    "name": "AllowAllWindowsAzureIps",
+                    "properties": {
+                        "startIpAddress": "0.0.0.0",
+                        "endIpAddress": "0.0.0.0"
+                    }
+                },
+                {
+                    // creating failoverGroup
+                    "type": "failoverGroups",
+                    "apiVersion": "2015-05-01-preview",
+                    "name": "[parameters('failoverGroup-name')]",
+                    "properties": {
+                        "partnerServers": [
+                            {
+                                "id": "[resourceId('Microsoft.Sql/servers/',parameters('Sql-Secondary-Server-50'))]"
+                            }
+                        ],
+                        "readWriteEndpoint": {
+                            "failoverPolicy": "Automatic",
+                            "failoverWithDataLossGracePeriodMinutes": 60
+                        },
+                        "readOnlyEndpoint": {
+                            "failoverPolicy": "Disabled"
+                        },
+                        "databases": [
+                            "[resourceId('Microsoft.Sql/servers/databases', parameters('Sql-Primary-Server-50'), parameters('Sql-Primary-DB-50'))]"
+                        ]
+                    },
+                    "dependsOn": [
+                        "[parameters('Sql-Primary-Server-50')]",
+                        "[resourceId('Microsoft.Sql/servers/databases',parameters('Sql-Primary-Server-50'), parameters('Sql-Primary-DB-50'))]",
+                        "[resourceId('Microsoft.Sql/servers',parameters('Sql-Secondary-Server-50'))]"
+                    ]
+                },
+                {
+                    // primary database
+                    "name": "[parameters('Sql-Primary-DB-50')]",
+                    "type": "databases",
+                    "apiVersion": "2014-04-01",
+                    "location": "[parameters('Primary-sql-location')]",
+                    "dependsOn": [
+                        "[parameters('Sql-Primary-Server-50')]"
+                    ],
+                    "properties": {
+                        "edition": "Basic",
+                        "requestedServiceObjectiveName": "Basic"
+
+                    }
+
+                }
+            ]
+        },
+     {
+         // secondary server
+         "name": "[parameters('Sql-Secondary-Server-50')]",
+         "type": "Microsoft.Sql/servers",
+         "apiVersion": "2014-04-01",
+         "location": "[parameters('Sql-Secondary-location')]",
+         "tags": {
+             "displayName": "[parameters('Sql-Secondary-Server-50')]"
+         },
+         "properties": {
+             "administratorLogin": "[parameters('Secondary-server-username')]",
+             "administratorLoginPassword": "[parameters('Secondary-server-password')]"
+         },
+         "resources": [
+             {
+                 // creating firewallrules
+                 "type": "firewallRules",
+                 "apiVersion": "2014-04-01",
+                 "dependsOn": [
+                     "[resourceId('Microsoft.Sql/servers', parameters('Sql-Secondary-Server-50'))]"
+                 ],
+                 "location": "[parameters('Sql-Secondary-location')]",
+                 "name": "AllowAllWindowsAzureIps",
+                 "properties": {
+                     "startIpAddress": "0.0.0.0",
+                     "endIpAddress": "0.0.0.0"
+                 }
+             }
+         ]
+     }
+
+    ],
+    "outputs": {}
+}

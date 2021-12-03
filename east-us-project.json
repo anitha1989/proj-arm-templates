@@ -1,0 +1,439 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        //location
+        "location-east": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //vnet name
+        "east-us-vnetname": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //vnet address range
+        "east-us-vnet-addressprefixes": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //subnet address range
+        "east-us-subnet-addressprefix": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //public ip
+        "east-us-public-ip": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //asp name
+        "app-service-plan-name": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // web app name
+        "east-us-web-app": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        
+        //application gateway
+        "east-us-applicationgateway": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //ssl value
+        "certdata": {
+            "type": "securestring",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //ssl password
+        "certpassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "description"
+            }
+        },    
+              
+        //existing key vault id
+        "existingKeyVaultname": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // existing key vault certificate name
+      "existingKeyVaultSecretName": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //customdomain name
+        "customdomain": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        }
+
+    },
+    "functions": [],
+    "variables": {
+    
+         "certificateName": "[concat(parameters('east-us-web-app'),'-cert')]",
+         //to get the existed keyvault id
+         "id": "[resourceId('Microsoft.keyVault/vaults',parameters('existingKeyVaultname'))]",
+         // to check the kevault id empty or not condetion
+         "enableSSL": "[not(empty(variables('id')))]"
+    },
+    "resources": [
+         // east us vnet creating
+         {
+            "name": "[parameters('east-us-vnetname')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-11-01",
+            "location": "[parameters('location-east')]",
+            "tags": {
+                "displayName": "[parameters('east-us-vnetname')]"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('east-us-vnet-addressprefixes')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "Subnet-1",
+                        "properties": {
+                            "addressPrefix": "[parameters('east-us-subnet-addressprefix')]"
+                        }
+                    }
+                ]
+            }
+        },
+            
+        // east us public ip creating
+        {
+            "name": "[parameters('east-us-public-ip')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-11-01",
+            "location": "[parameters('location-east')]",
+            "tags": {
+                "displayName": "publicIPAddress1"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('east-us-public-ip')]"
+                }
+            },
+
+            "sku": {
+                "name": "Standard",
+                "tier": "Regional"
+            }
+        },
+        // east app service plan
+        {
+            
+            "name": "[parameters('app-service-plan-name')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2020-12-01",
+            "location": "[parameters('location-east')]",
+            "sku": {
+                "name": "S1",
+                "capacity": 1
+            },
+           
+            "properties": {
+                "name": "[parameters('app-service-plan-name')]"
+            }
+        },
+        // east us web app creating
+        {  
+            "name": "[parameters('east-us-web-app')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2020-12-01",
+            "location": "[parameters('location-east')]",
+            "tags": {
+                "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/appServicePlan1')]": "Resource",
+                "displayName": "webApp1"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('app-service-plan-name'))]"
+            ],
+            "properties": {
+                "name": "[parameters('east-us-web-app')]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('app-service-plan-name'))]"
+            }
+        },
+
+        {
+            "condition": "[variables('enableSSL')]",
+            "type": "Microsoft.Web/certificates",
+            "apiVersion": "2019-08-01",
+            "name": "[variables('certificateName')]",
+            "location": "[parameters('location-east')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('east-us-web-app'))]"
+            ],
+            "properties": {
+            
+                // getting keyvault id
+                "keyVaultId": "[variables('id')]",
+            
+                // give keyvault certificate name
+                "keyVaultSecretName": "[parameters('existingKeyVaultSecretName')]",
+            
+                "serverFarmId": "[resourceId('Microsoft.Web/serverFarms', parameters('app-service-plan-name'))]",
+                
+                // ssl password
+               "password": "1234"
+               
+            }
+        },
+        // ssl binding and customdomain for east web app
+        {
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2021-02-01",
+            "name": "[concat(parameters('east-us-web-app'),'/',parameters('customdomain'))]",
+            "location": "[parameters('location-east')]",
+             "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('east-us-web-app'))]",
+                "[resourceId('Microsoft.Web/certificates', variables('certificateName'))]"
+            ],
+            "properties": { 
+            
+            //to get the existed keyvault id
+            "sslState": "[if(variables('enableSSL'),'SniEnabled',json('null'))]",
+            
+            // getting the ssl thumbprint for ssl bind
+            "thumbprint": "[if(variables('enableSSL'), reference(resourceId('Microsoft.Web/certificates', variables('certificateName'))).Thumbprint, json('null'))]"
+            }
+        },
+
+         
+         //east us application gateway
+        {
+           
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('east-us-applicationgateway')]",
+            "location": "[parameters('location-east')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('east-us-vnetname'))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses',parameters('east-us-public-ip'))]"
+            ],
+            "properties": {
+                "sku": {
+                    "name": "WAF_v2",
+                    "tier": "WAF_v2",
+                    "capacity": 2
+                },
+                //here we convert ssl certficate to base64string and take the "value " of certficate and mention in parameters
+                "sslCertificates": [
+                    {
+                        "name": "apgwsslcert",
+                        "properties": {
+                            // certficate value
+                            "data": "[parameters('certdata')]",
+                            // certficate password
+                            "password": "[parameters('certpassword')]"  
+                                                     
+                                                        
+                        }
+                    }
+                ],
+                "gatewayIPConfigurations": [
+                    {
+                        "name": "appGatewayIpConfig",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('east-us-vnetname'), 'Subnet-1')]"
+                            }
+                        }
+                    }
+                ],
+                // frontednd ip config
+                "frontendIPConfigurations": [
+                    {
+                        "name": "appGatewayFrontendIP",
+                        "properties": {
+                            "PublicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('east-us-public-ip'))]"
+                            }
+                        }
+                    }
+                ],
+                "frontendPorts": [
+                    {
+                        "name": "Http-FrontendPort",
+                        "properties": {
+                            "Port": 80
+                            
+                        }
+                    },
+                    {
+                        "name": "Https-FrontendPort",
+                        "properties": {
+                            "Port": 443
+                        }
+                    }
+                ],
+                // Backend Pools
+                "backendAddressPools": [
+                    {
+                        "name": "appGatewayBackendPool",
+                        "properties": {
+                            "backendAddresses": [
+                                {
+                                    "fqdn": "[concat(parameters('east-us-web-app'),'.','azurewebsites.net')]"
+                                 }
+                            ]
+                        }
+                    }
+                ],
+
+                // backend settings
+                "backendHttpSettingsCollection": [
+                     // Http Settings
+                     {
+                        "name": "Http-Settings",
+                        "properties": {
+                            "Port": 80,
+                            "Protocol": "Http",
+                            "pickHostNameFromBackendAddress": true,
+                            "path": "/",
+                            "probeEnabled": false,
+                            "CookieBasedAffinity": "Disabled"
+                           
+                        }
+                    },
+                    // Https Settings
+                    {
+                        "name": "Https-Settings",
+                        "properties": {
+                            "Port": 443,
+                            "Protocol": "Https",
+                            "pickHostNameFromBackendAddress": true,
+                            "path": "/",
+                            "probeEnabled": false,
+                            "CookieBasedAffinity": "Disabled"
+                        }
+                    }
+                ],
+
+                // Listeners
+                "httpListeners": [
+                   // Http Listener
+                     {
+                        "name": "Http-Listener",
+                        "properties": {
+                            "FrontendIPConfiguration": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('east-us-applicationgateway'), 'appGatewayFrontendIP')]"
+                            },
+                            "FrontendPort": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts',  parameters('east-us-applicationgateway'), 'Http-FrontendPort')]"
+                            },
+                            "Protocol": "Http"
+                        }
+                        
+                    },
+                    // Https Listner
+                    {
+                        "name": "Https-Listener",
+                        "properties": {
+                            "FrontendIPConfiguration": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('east-us-applicationgateway'), 'appGatewayFrontendIP')]"
+                            },
+                            "FrontendPort": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts',  parameters('east-us-applicationgateway'), 'Https-FrontendPort')]"
+                            },
+                            "Protocol": "Https",
+                            "sslCertificate": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/sslCertificates',parameters('east-us-applicationgateway'),'apgwsslcert')]"
+                            }
+                        }
+                    }
+                ],
+
+                //Routing Rules
+                "requestRoutingRules": [
+                     // Http Rule
+                     {
+                        "Name": "Http-Rule",
+                        "properties": {
+                            "RuleType": "Basic",
+                            "httpListener": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('east-us-applicationgateway'), 'Http-Listener')]"
+                            },
+                            
+                             "redirectConfiguration": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/redirectConfigurations',parameters('east-us-applicationgateway'),'Redirect-Http-Rule')]"
+                            } 
+                   }
+                        
+                    },
+                    // Https Rule
+                    {
+                        "Name": "Https-Rule",
+                        "properties": {
+                            "RuleType": "Basic",
+                            "httpListener": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('east-us-applicationgateway'), 'Https-Listener')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/backendAddressPools', parameters('east-us-applicationgateway'), 'appGatewayBackendPool')]"
+                            },
+                            "backendHttpSettings": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parameters('east-us-applicationgateway'), 'Https-Settings')]"
+                            }
+                        }
+                    }
+                ],
+                //  Http Rule Redirect to Https
+                "redirectConfigurations": [
+                      {
+                          "name": "Redirect-Http-Rule",
+                          "properties": {
+                              "redirectType": "Permanent",
+                              "targetListener": {
+                                  "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('east-us-applicationgateway'), 'Https-Listener')]"
+                              },
+                              "includePath": true,
+                            "includeQueryString": true,
+                           "requestRoutingRules": [
+                                {
+                                    "id": "[resourceId('Microsoft.Network/applicationGateways/requestRoutingRules', parameters('east-us-applicationgateway'), 'Http-Rule')]"
+                                }
+                            ]
+                          }
+                       }  
+                ]
+            }
+        }
+     
+         ],
+    "outputs": {}
+}

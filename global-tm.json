@@ -1,0 +1,94 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        //tm name
+        "tmname": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // existing pip name
+        "existing-pip-name1": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // existing pip name
+        "existing-pip-name2": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        }
+
+    },
+    "functions": [],
+    "variables": {},
+    "resources": [
+        {
+          //Traffic Manager Creating
+         "name": "[parameters('tmname')]",
+         "type": "Microsoft.Network/trafficManagerProfiles",
+         "apiVersion": "2018-04-01",
+         "tags": {},
+         "location": "global",
+         "properties": {
+             "profileStatus": "Enabled",
+             "trafficRoutingMethod": "Priority",
+             
+             
+             "dnsConfig": {
+                 "relativeName": "[parameters('tmname')]",
+                 "ttl": 30
+             },
+             
+             
+             "monitorConfig": {
+                 "protocol": "HTTP",
+                 "port": 80,
+                 "path": "/",
+                 "intervalInSeconds": 30,
+                 "timeoutInSeconds": 5,
+                 "toleratedNumberOfFailures": 3,
+                 "profileMonitorStatus": "Online"
+             },
+             
+             
+            "endpoints": [
+                 {
+                     "name": "eastapgw",
+                     "type": "Microsoft.Network/trafficManagerProfiles/azureEndpoints",
+                     "properties": {
+                         "endpointStatus": "Enabled",
+                         //get existing agw pip 
+                         "targetResourceId": "[resourceId('Microsoft.Network/publicIPAddresses',parameters('existing-pip-name1'))]",
+                         "priority": 1
+                        
+                         
+                     }
+                 },
+                 {
+                     "name": "westapgw",
+                     "type": "Microsoft.Network/trafficManagerProfiles/azureEndpoints",
+                     "properties": {
+                         "endpointStatus": "Enabled",
+                         //get existing agw pip 
+                         "targetResourceId": "[resourceId('Microsoft.Network/publicIPAddresses',parameters('existing-pip-name2'))]",
+                         "priority": 2
+                         
+                     }
+                 }
+                 
+             ]
+           
+         }
+         
+        
+     }
+     
+    ],
+    "outputs": {}
+}

@@ -1,0 +1,2 @@
+$ssl = Get-Content 'C:\Users\rajas\Desktop\ssrtechno.pfx' -Encoding Byte
+>> [system.Convert]::ToBase64String($ssl) | Out-File 'pfx-encode.txt'

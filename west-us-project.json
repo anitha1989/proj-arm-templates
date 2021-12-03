@@ -1,0 +1,431 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        //location
+        "location-west": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+
+        // vnetname
+        "west-us-vnetname": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //vnet address range
+        "west-us-vnet-addressprefixes": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // subnet address range
+        "west-us-subnet-addressprefixes": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //public ip
+        "west-us-public-ip": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // asp 
+        "west-app-service-plan": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //web app name
+        "west-us-webapp": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+    
+        //application gateway
+        "west-us-applicationgateway": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //ssl value
+        "certdata": {
+            "type": "securestring",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //ssl password
+        "certpassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //existing key vault id
+        "existingKeyVaultname": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        // existing key vault certificate name
+        "existingKeyVaultSecretName": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        //customdomain name
+        "customdomain": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        }
+
+    },
+    "functions": [],
+    "variables": {
+        "certificateName": "[concat(parameters('west-us-webapp'),'-cert')]",
+        //to get the existed keyvault id
+         "id": "[resourceId('Microsoft.keyVault/vaults',parameters('existingKeyVaultname'))]",
+         // to check the kevault id empty or not condetion
+         "enableSSL": "[not(empty(variables('id')))]"
+    },
+    "resources": [
+        {
+            // west us vnet creating
+            "name": "[parameters('west-us-vnetname')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-11-01",
+            "location": "[parameters('location-west')]",
+            "tags": {
+                "displayName": "[parameters('west-us-vnetname')]"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('west-us-vnet-addressprefixes')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "Subnet-1",
+                        "properties": {
+                            "addressPrefix": "[parameters('west-us-subnet-addressprefixes')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            // west us public ip creating
+            "name": "[parameters('west-us-public-ip')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-11-01",
+            "location": "[parameters('location-west')]",
+            "tags": {
+                "displayName": "publicIPAddress1"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('west-us-public-ip')]"
+                }
+            },
+            "sku": {
+                "name": "Standard",
+                "tier": "Regional"
+            }
+        },
+        {
+            //west app service plan
+            "name": "[parameters('west-app-service-plan')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2020-12-01",
+            "location": "[parameters('location-west')]",
+            "sku": {
+                "name": "S1",
+                "capacity": 1
+            },
+            "tags": {
+                "displayName": "appServicePlan1"
+            },
+            "properties": {
+                "name": "[parameters('west-app-service-plan')]"
+            }
+        },
+        {
+            // west us web app creating
+            "name": "[parameters('west-us-webapp')]",
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2020-12-01",
+            "location": "[parameters('location-west')]",
+            "tags": {
+                "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/appServicePlan1')]": "Resource",
+                "displayName": "[parameters('west-us-webapp')]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('west-app-service-plan'))]"
+            ],
+            "properties": {
+                "name": "[parameters('west-us-webapp')]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('west-app-service-plan'))]"
+            }
+        },
+        {
+           "condition": "[variables('enableSSL')]",
+            "type": "Microsoft.Web/certificates",
+            "apiVersion": "2019-08-01",
+            "name": "[variables('certificateName')]",
+            "location": "[parameters('location-west')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('west-us-webapp'))]"
+            ],
+            "properties": {
+                 // getting keyvault id
+                "keyVaultId": "[variables('id')]",  
+                
+                 // give keyvault certificate name             
+                "keyVaultSecretName": "[parameters('existingKeyVaultSecretName')]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverFarms', parameters('west-app-service-plan'))]",
+                
+                //ssl password
+                "password": "1234"
+            }
+        },
+        {
+            // ssl binding and customdomain for west web app
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "apiVersion": "2019-08-01",
+            "name": "[concat(parameters('west-us-webapp'),'/',parameters('customdomain'))]",
+            "location": "[parameters('location-west')]",
+             "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('west-us-webapp'))]",
+                "[resourceId('Microsoft.Web/certificates', variables('certificateName'))]"
+            ],
+            "properties": { 
+            
+             //to get the existed keyvault id
+              "sslState": "[if(variables('enableSSL'), 'SniEnabled', json('null'))]",
+            
+             // getting the ssl thumbprint for ssl bind
+                "thumbprint": "[if(variables('enableSSL'), reference(resourceId('Microsoft.Web/certificates', variables('certificateName'))).Thumbprint, json('null'))]"
+               
+            }
+        },
+        
+        {
+            //west us application gateway
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('west-us-applicationgateway')]",
+            "location": "[parameters('location-west')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('west-us-vnetname'))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses',parameters('west-us-public-ip'))]"
+            ],
+            "properties": {
+                "sku": {
+                    "name": "WAF_v2",
+                    "tier": "WAF_v2",
+                    "capacity": 2
+                },
+                //here we convert ssl certficate to base64string and take the "value " of certficate and mention in parameters
+                "sslCertificates": [
+                    {
+                        "name": "apgwsslcert",
+                        "properties": {
+                             // certficate value
+                            "data": "[parameters('certdata')]",
+                            // certficate password
+                            "password": "[parameters('certpassword')]"                           
+                                                        
+                        }
+                    }
+                ],
+                "gatewayIPConfigurations": [
+                    {
+                        "name": "appGatewayIpConfig",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('west-us-vnetname'), 'Subnet-1')]"
+                            }
+                        }
+                    }
+                ],
+
+                //frontend ip config
+                "frontendIPConfigurations": [
+                    {
+                        "name": "appGatewayFrontendIP",
+                        "properties": {
+                            "PublicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('west-us-public-ip'))]"
+                            }
+                        }
+                    }
+                ],
+                "frontendPorts": [
+                    {
+                        "name": "Http-FrontendPort",
+                        "properties": {
+                            "Port": 80
+                            
+                        }
+                    },
+                    {
+                        "name": "Https-FrontendPort",
+                        "properties": {
+                            "Port": 443
+                        }
+                    }
+                ],
+                // Backend Pools
+                "backendAddressPools": [
+                    {
+                        "name": "appGatewayBackendPool",
+                        "properties": {
+                            "backendAddresses": [
+                                {
+                                    "fqdn": "[concat(parameters('west-us-webapp'),'.','azurewebsites.net')]"
+                                 }
+                            ]
+                        }
+                    }
+                ],
+
+                // backend settings
+                "backendHttpSettingsCollection": [
+                     // Http Settings
+                     {
+                        "name": "Http-Settings",
+                        "properties": {
+                            "Port": 80,
+                            "Protocol": "Http",
+                            "pickHostNameFromBackendAddress": true,
+                            "path": "/",
+                            "probeEnabled": false,
+                            "CookieBasedAffinity": "Disabled"
+                           
+                        }
+                    },
+                    // Https Settings
+                    {
+                        "name": "Https-Settings",
+                        "properties": {
+                            "Port": 443,
+                            "Protocol": "Https",
+                            "pickHostNameFromBackendAddress": true,
+                            "path": "/",
+                            "probeEnabled": false,
+                            "CookieBasedAffinity": "Disabled"
+                        }
+                    }
+                ],
+
+                // Listeners
+                "httpListeners": [
+                   // Http Listener
+                     {
+                        "name": "Http-Listener",
+                        "properties": {
+                            "FrontendIPConfiguration": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('west-us-applicationgateway'), 'appGatewayFrontendIP')]"
+                            },
+                            "FrontendPort": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts',  parameters('west-us-applicationgateway'), 'Http-FrontendPort')]"
+                            },
+                            "Protocol": "Http"
+                        }
+                        
+                    },
+                    // Https Listner
+                    {
+                        "name": "Https-Listener",
+                        "properties": {
+                            "FrontendIPConfiguration": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', parameters('west-us-applicationgateway'), 'appGatewayFrontendIP')]"
+                            },
+                            "FrontendPort": {
+                                "Id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts',  parameters('west-us-applicationgateway'), 'Https-FrontendPort')]"
+                            },
+                            "Protocol": "Https",
+                            "sslCertificate": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/sslCertificates',parameters('west-us-applicationgateway'),'apgwsslcert')]"
+                            }
+                        }
+                    }
+                ],
+
+                // Routing Rules
+                "requestRoutingRules": [
+                     // Http Rule
+                     {
+                        "Name": "Http-Rule",
+                        "properties": {
+                            "RuleType": "Basic",
+                            "httpListener": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('west-us-applicationgateway'), 'Http-Listener')]"
+                            },
+                            
+                             "redirectConfiguration": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/redirectConfigurations',parameters('west-us-applicationgateway'),'Redirect-Http-Rule')]"
+                            } 
+                   }
+                        
+                    },
+                    // Https Rule
+                    {
+                        "Name": "Https-Rule",
+                        "properties": {
+                            "RuleType": "Basic",
+                            "httpListener": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('west-us-applicationgateway'), 'Https-Listener')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/backendAddressPools', parameters('west-us-applicationgateway'), 'appGatewayBackendPool')]"
+                            },
+                            "backendHttpSettings": {
+                                "id": "[resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', parameters('west-us-applicationgateway'), 'Https-Settings')]"
+                            }
+                        }
+                    }
+                ],
+                //  Http Rule Redirect to Https
+                "redirectConfigurations": [
+                      {
+                          "name": "Redirect-Http-Rule",
+                          "properties": {
+                              "redirectType": "Permanent",
+                              "targetListener": {
+                                  "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', parameters('west-us-applicationgateway'), 'Https-Listener')]"
+                              },
+                              "includePath": true,
+                            "includeQueryString": true,
+                            "requestRoutingRules": [
+                                {
+                                    "id": "[resourceId('Microsoft.Network/applicationGateways/requestRoutingRules', parameters('west-us-applicationgateway'), 'Http-Rule')]"
+                                }
+                            ]
+                          }
+                       }  
+                ]
+            }
+        }
+    ],
+    "outputs": {}
+}
